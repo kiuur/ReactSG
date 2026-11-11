@@ -1,11 +1,21 @@
 {
-  "name": "instagram",
+  "name": "reactsg",
   "version": "1.0.0",
-  "description": "ReactSG",
+  "description": "Instagram Auto Story React & Viewer for mutual friends",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kiuur/ReactSG.git"
+  },
   "scripts": {
     "start": "node index.js"
   },
+  "keywords": [
+    "instagram",
+    "instagram-story",
+    "auto-react",
+    "story-viewer"
+  ],
   "type": "commonjs",
   "dependencies": {
     "instagram-password-encryption": "^1.0.1"

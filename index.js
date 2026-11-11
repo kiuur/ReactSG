@@ -1,8 +1,13 @@
 const path = require('path');
+const dns = require('dns');
 const crypto = require('crypto');
 const fs = require('fs');
 const readline = require('readline');
 const { encryptPassword } = require('instagram-password-encryption');
+
+try {
+  if (dns.setDefaultResultOrder) dns.setDefaultResultOrder('ipv4first');
+} catch (e) {}
 
 class InstagramStoryBot {
   constructor() {
@@ -52,6 +57,25 @@ class InstagramStoryBot {
 
   loadSession() {
     try {
+      if (process.env.IG_SESSION) {
+        let envData = null;
+        try {
+          envData = JSON.parse(process.env.IG_SESSION);
+        } catch (e) {
+          envData = { sessionId: process.env.IG_SESSION };
+        }
+        if (envData && envData.sessionId) {
+          if (envData.username) this.username = envData.username;
+          if (envData.userId) this.userId = String(envData.userId);
+          this.sessionId = envData.sessionId;
+          this.csrfToken = envData.csrfToken || '';
+          this.fullCookie = envData.fullCookie || `sessionid=${this.sessionId}; ds_user_id=${this.userId}`;
+          if (envData.deviceId) this.deviceId = envData.deviceId;
+          if (envData.androidId) this.androidId = envData.androidId;
+          return true;
+        }
+      }
+
       if (!fs.existsSync(this.sessionsDir)) return false;
 
       let targetFile = null;
@@ -431,6 +455,51 @@ class InstagramStoryBot {
     return false;
   }
 
+  async runCycle() {
+    if (!this.sessionId || !this.userId) {
+      return { friendsCount: 0, viewedCount: 0, likedCount: 0 };
+    }
+
+    this.friends = await this.fetchMutualFriends();
+    const traySessionId = crypto.randomUUID();
+    const viewerSessionId = crypto.randomUUID();
+
+    const friendIds = Array.from(this.friends.keys()).filter((id) => id !== this.userId);
+    const reels = await this.fetchReelsMedia(friendIds);
+
+    let viewedCount = 0;
+    let likedCount = 0;
+
+    for (const [friendId, reelData] of Object.entries(reels)) {
+      const items = reelData.items || [];
+
+      for (const item of items) {
+        const storyId = String(item.id || item.pk);
+
+        if (!this.processedStories.has(storyId)) {
+          this.processedStories.add(storyId);
+
+          await this.markStorySeen(item, friendId);
+          viewedCount++;
+          await this.sleep(1500);
+
+          if (!item.has_liked) {
+            await this.sendStoryLike(storyId, traySessionId, viewerSessionId);
+            likedCount++;
+          }
+
+          await this.sleep(1000);
+        }
+      }
+    }
+
+    return {
+      friendsCount: this.friends.size,
+      viewedCount,
+      likedCount,
+    };
+  }
+
   async start() {
     if (!this.sessionId || !this.userId) {
       const creds = await this.promptCredentials();
@@ -445,54 +514,22 @@ class InstagramStoryBot {
 
     console.log(`— berhasil terhubung ke: @${this.username || this.userId}`);
 
-    this.friends = await this.fetchMutualFriends();
-
     let cycleCount = 0;
 
     while (true) {
       cycleCount++;
-
-      if (cycleCount % 20 === 0) {
-        const updatedFriends = await this.fetchMutualFriends();
-        if (updatedFriends.size > 0) {
-          this.friends = updatedFriends;
-        }
-      }
-
-      const traySessionId = crypto.randomUUID();
-      const viewerSessionId = crypto.randomUUID();
-
-      const friendIds = Array.from(this.friends.keys()).filter((id) => id !== this.userId);
-      const reels = await this.fetchReelsMedia(friendIds);
-
-      for (const [friendId, reelData] of Object.entries(reels)) {
-        const items = reelData.items || [];
-
-        for (const item of items) {
-          const storyId = String(item.id || item.pk);
-
-          if (!this.processedStories.has(storyId)) {
-            this.processedStories.add(storyId);
-
-            await this.markStorySeen(item, friendId);
-            await this.sleep(2000);
-
-            if (!item.has_liked) {
-              await this.sendStoryLike(storyId, traySessionId, viewerSessionId);
-            }
-
-            await this.sleep(1000);
-          }
-        }
-      }
-
+      await this.runCycle();
       await this.sleep(15000);
     }
   }
 }
 
-const bot = new InstagramStoryBot();
-bot.start().catch((err) => {
-  console.error('— error:', err.message || err);
-  process.exit(1);
-});
+if (require.main === module) {
+  const bot = new InstagramStoryBot();
+  bot.start().catch((err) => {
+    console.error('— error:', err.message || err);
+    process.exit(1);
+  });
+}
+
+module.exports = { InstagramStoryBot };
