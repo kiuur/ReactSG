@@ -310,9 +310,10 @@ class InstagramStoryBot {
       }
 
       if (data.message === 'checkpoint_required') {
+        this.lastCheckpointUrl = data.checkpoint_url ? `https://www.instagram.com${data.checkpoint_url}` : '';
         console.log('— verifikasi checkpoint diperlukan');
-        if (data.checkpoint_url) {
-          console.log(`— link verifikasi: https://www.instagram.com${data.checkpoint_url}`);
+        if (this.lastCheckpointUrl) {
+          console.log(`— link verifikasi: ${this.lastCheckpointUrl}`);
         }
         return false;
       }
@@ -560,13 +561,10 @@ class InstagramStoryBot {
 
       const loggedIn = await this.login();
       if (!loggedIn) {
-        const manual = await this.askQuestion('乂 - Atau tempel Session ID (bebas checkpoint): ');
-        if (manual) {
-          const applied = this.applySessionInput(manual);
-          if (!applied) {
-            console.log('— session id tidak valid');
-            return;
-          }
+        if (this.lastCheckpointUrl) {
+          await this.askQuestion('乂 - Tekan Enter setelah selesai konfirmasi di browser: ');
+          const retried = await this.login();
+          if (!retried) return;
         } else {
           return;
         }
