@@ -37,17 +37,52 @@ class InstagramStoryBot {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  askQuestion(query) {
+  promptSession() {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
     });
     return new Promise((resolve) => {
-      rl.question(query, (ans) => {
-        rl.close();
-        resolve(ans.trim());
+      rl.question('乂 - User ID: ', (uid) => {
+        rl.question('乂 - Session ID: ', (sid) => {
+          rl.close();
+          resolve({
+            userId: uid.trim(),
+            sessionId: sid.trim(),
+          });
+        });
       });
     });
+  }
+
+  async applyManualSession(rawUid, rawSid) {
+    if (!rawSid && !rawUid) return false;
+
+    let uid = (rawUid || '').replace(/[^0-9]/g, '').trim();
+    let sid = (rawSid || '').trim();
+
+    if (sid.includes('sessionid=')) {
+      const matchSid = sid.match(/sessionid=([^;]+)/);
+      if (matchSid) sid = matchSid[1];
+    }
+
+    if (!uid && sid) {
+      const decoded = decodeURIComponent(sid);
+      const parts = decoded.split(':');
+      if (parts[0] && /^\d+$/.test(parts[0])) {
+        uid = parts[0];
+      }
+    }
+
+    if (sid && uid) {
+      this.sessionId = sid;
+      this.userId = uid;
+      this.fullCookie = `sessionid=${this.sessionId}; ds_user_id=${this.userId}`;
+      await this.fetchUsername();
+      this.saveSession();
+      return true;
+    }
+    return false;
   }
 
   async fetchUsername() {
@@ -570,12 +605,10 @@ class InstagramStoryBot {
 
   async start() {
     if (!this.sessionId || !this.userId) {
-      const input = await this.askQuestion('乂 - Masukkan Session ID: ');
-      if (!input) return;
-
-      const applied = await this.applySessionInput(input);
+      const creds = await this.promptSession();
+      const applied = await this.applyManualSession(creds.userId, creds.sessionId);
       if (!applied) {
-        console.log('— session id tidak valid');
+        console.log('— data sesi tidak valid');
         return;
       }
     }
