@@ -561,12 +561,16 @@ class InstagramStoryBot {
 
       const loggedIn = await this.login();
       if (!loggedIn) {
-        if (this.lastCheckpointUrl) {
-          await this.askQuestion('乂 - Tekan Enter setelah selesai konfirmasi di browser: ');
+        const input = await this.askQuestion('乂 - Tempel Session ID / Cookie (atau tekan Enter untuk coba lagi): ');
+        if (input) {
+          const applied = this.applySessionInput(input);
+          if (!applied) {
+            console.log('— session id tidak valid');
+            return;
+          }
+        } else {
           const retried = await this.login();
           if (!retried) return;
-        } else {
-          return;
         }
       }
     }
