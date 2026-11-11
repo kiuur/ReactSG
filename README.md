@@ -24,37 +24,37 @@ A lightweight, automated Instagram bot to watch (view) and react (like) to stori
 
 ---
 
-## How to Get User ID and Session ID
+## How to Get User ID and Session ID via Kiwi Browser (Android)
 
-### Method 1: Using Kiwi Browser on Android (Recommended for Mobile)
-
-Standard mobile browsers hide `HttpOnly` cookies like `sessionid`. Using Kiwi Browser allows you to install browser extensions and view cookies directly on Android.
+Kiwi Browser has built-in Chrome Developer Tools (DevTools), allowing you to extract `HttpOnly` cookies directly without installing any browser extensions:
 
 1. **Install Kiwi Browser**:
    - Download and install **Kiwi Browser** from the Google Play Store.
 
-2. **Install Cookie-Editor Extension**:
-   - Open Kiwi Browser and open the Chrome Web Store:
-     `https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm`
-   - Tap **Add to Chrome**.
+2. **Login to Instagram**:
+   - Open Kiwi Browser, go to `https://www.instagram.com`, and log in to your account.
 
-3. **Get Your Credentials**:
-   - Open `https://www.instagram.com` in Kiwi Browser and log in to your account.
+3. **Open Developer Tools**:
    - Tap the **three dots menu (⋮)** in the top-right corner of Kiwi Browser.
-   - Scroll down to the bottom and tap **Cookie-Editor**.
-   - Look for the following cookies:
-     - `ds_user_id`: Copy the numeric value for your **User ID** (e.g. `73356967687`).
-     - `sessionid`: Copy the long alphanumeric value for your **Session ID** (e.g. `73356967687%3Af3Myu...`).
+   - Scroll down and tap **Developer Tools**.
+
+4. **Navigate to Cookies**:
+   - In the top tab bar (*Elements, Console, Sources...*), scroll to the right and tap **Application** (or **Storage**).
+   - In the left menu, expand **Cookies** and select `https://www.instagram.com`.
+
+5. **Copy the Values**:
+   - `ds_user_id`: Tap or double-tap the value column to copy your numeric **User ID** (e.g. `73356967687`).
+   - `sessionid`: Tap or double-tap the value column to copy your **Session ID** (e.g. `73356967687%3Af3Myu...`).
 
 ---
 
-### Method 2: Using Desktop Browser (PC / Laptop)
+## Alternative: Desktop Browser (PC / Laptop)
 
 1. Open `https://www.instagram.com` in your PC browser (Chrome, Edge, Brave, or Firefox) and log in.
 2. Press `F12` on your keyboard (or right-click anywhere and select **Inspect**).
-3. Navigate to the **Application** tab (named **Storage** in Firefox).
+3. Go to the **Application** tab (named **Storage** in Firefox).
 4. In the left panel, expand **Cookies** and click on `https://www.instagram.com`.
-5. Locate the following entries in the table:
+5. Find:
    - `ds_user_id`: Copy its value for your **User ID**.
    - `sessionid`: Copy its value for your **Session ID**.
 
