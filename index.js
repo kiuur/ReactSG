@@ -37,6 +37,55 @@ class InstagramStoryBot {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  askQuestion(query) {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    return new Promise((resolve) => {
+      rl.question(query, (ans) => {
+        rl.close();
+        resolve(ans.trim());
+      });
+    });
+  }
+
+  applySessionInput(input) {
+    if (!input) return false;
+    let sid = '';
+    let uid = '';
+    let csrf = '';
+
+    if (input.includes('sessionid=')) {
+      const matchSid = input.match(/sessionid=([^;]+)/);
+      if (matchSid) sid = matchSid[1];
+      const matchUid = input.match(/ds_user_id=([^;]+)/);
+      if (matchUid) uid = matchUid[1];
+      const matchCsrf = input.match(/csrftoken=([^;]+)/);
+      if (matchCsrf) csrf = matchCsrf[1];
+    } else {
+      sid = input.trim();
+    }
+
+    if (!uid && sid) {
+      const decoded = decodeURIComponent(sid);
+      const parts = decoded.split(':');
+      if (parts[0] && /^\d+$/.test(parts[0])) {
+        uid = parts[0];
+      }
+    }
+
+    if (sid && uid) {
+      this.sessionId = sid;
+      this.userId = uid;
+      if (csrf) this.csrfToken = csrf;
+      this.fullCookie = `sessionid=${this.sessionId}; ds_user_id=${this.userId}${this.csrfToken ? `; csrftoken=${this.csrfToken}` : ''}`;
+      this.saveSession();
+      return true;
+    }
+    return false;
+  }
+
   promptCredentials() {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -169,6 +218,9 @@ class InstagramStoryBot {
         if (mCsrf) pageCsrf = mCsrf[1];
       }
 
+      const mHash = html.match(/"rollout_hash":"([^"]+)"/) || html.match(/"client_revision":(\d+)/);
+      const rolloutHash = mHash ? mHash[1] : '1053981060';
+
       const encMatch = html.match(
         /\["InstagramPasswordEncryption",\[\],\{"key_id":"(\d+)","public_key":"([a-f0-9]{64})","version":"(\d+)"\}/
       );
@@ -198,7 +250,7 @@ class InstagramStoryBot {
           'X-Requested-With': 'XMLHttpRequest',
           'X-IG-App-ID': '936619743392459',
           'X-ASBD-ID': '129477',
-          'X-Instagram-AJAX': '1018314172',
+          'X-Instagram-AJAX': rolloutHash,
           'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
           'Sec-Ch-Ua-Mobile': '?0',
           'Sec-Ch-Ua-Platform': '"Windows"',
@@ -252,8 +304,8 @@ class InstagramStoryBot {
         return true;
       }
 
-      if (data.error_type === 'UserInvalidCredentials') {
-        console.log('— username atau password salah');
+      if (data.error_type === 'UserInvalidCredentials' || data.error_type === 'FakeIncorrectPassword') {
+        console.log('— password atau username salah');
         return false;
       }
 
@@ -508,7 +560,16 @@ class InstagramStoryBot {
 
       const loggedIn = await this.login();
       if (!loggedIn) {
-        return;
+        const manual = await this.askQuestion('乂 - Atau tempel Session ID (bebas checkpoint): ');
+        if (manual) {
+          const applied = this.applySessionInput(manual);
+          if (!applied) {
+            console.log('— session id tidak valid');
+            return;
+          }
+        } else {
+          return;
+        }
       }
     }
 
