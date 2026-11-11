@@ -50,7 +50,21 @@ class InstagramStoryBot {
     });
   }
 
-  applySessionInput(input) {
+  async fetchUsername() {
+    try {
+      const res = await fetch(`https://i.instagram.com/api/v1/users/${this.userId}/info/`, {
+        headers: this.getHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user && data.user.username) {
+          this.username = data.user.username;
+        }
+      }
+    } catch (e) {}
+  }
+
+  async applySessionInput(input) {
     if (!input) return false;
     let sid = '';
     let uid = '';
@@ -80,6 +94,7 @@ class InstagramStoryBot {
       this.userId = uid;
       if (csrf) this.csrfToken = csrf;
       this.fullCookie = `sessionid=${this.sessionId}; ds_user_id=${this.userId}${this.csrfToken ? `; csrftoken=${this.csrfToken}` : ''}`;
+      await this.fetchUsername();
       this.saveSession();
       return true;
     }
@@ -555,23 +570,13 @@ class InstagramStoryBot {
 
   async start() {
     if (!this.sessionId || !this.userId) {
-      const creds = await this.promptCredentials();
-      this.username = creds.username;
-      this.password = creds.password;
+      const input = await this.askQuestion('乂 - Masukkan Session ID: ');
+      if (!input) return;
 
-      const loggedIn = await this.login();
-      if (!loggedIn) {
-        const input = await this.askQuestion('乂 - Tempel Session ID / Cookie (atau tekan Enter untuk coba lagi): ');
-        if (input) {
-          const applied = this.applySessionInput(input);
-          if (!applied) {
-            console.log('— session id tidak valid');
-            return;
-          }
-        } else {
-          const retried = await this.login();
-          if (!retried) return;
-        }
+      const applied = await this.applySessionInput(input);
+      if (!applied) {
+        console.log('— session id tidak valid');
+        return;
       }
     }
 
