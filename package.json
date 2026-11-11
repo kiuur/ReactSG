@@ -16,8 +16,5 @@
     "auto-react",
     "story-viewer"
   ],
-  "type": "commonjs",
-  "dependencies": {
-    "instagram-password-encryption": "^1.0.1"
-  }
+  "type": "commonjs"
 }

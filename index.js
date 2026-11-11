@@ -3,7 +3,6 @@ const dns = require('dns');
 const crypto = require('crypto');
 const fs = require('fs');
 const readline = require('readline');
-const { encryptPassword } = require('instagram-password-encryption');
 
 try {
   if (dns.setDefaultResultOrder) dns.setDefaultResultOrder('ipv4first');
@@ -13,11 +12,8 @@ class InstagramStoryBot {
   constructor() {
     this.sessionsDir = path.join(__dirname, 'sessions');
     this.username = '';
-    this.password = '';
     this.userId = '';
     this.sessionId = '';
-    this.csrfToken = '';
-    this.fullCookie = '';
     this.deviceId = crypto.randomUUID();
     this.androidId = 'android-' + crypto.randomBytes(8).toString('hex');
 
@@ -55,6 +51,20 @@ class InstagramStoryBot {
     });
   }
 
+  async fetchUsername() {
+    try {
+      const res = await fetch(`https://i.instagram.com/api/v1/users/${this.userId}/info/`, {
+        headers: this.getHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user && data.user.username) {
+          this.username = data.user.username;
+        }
+      }
+    } catch (e) {}
+  }
+
   async applyManualSession(rawUid, rawSid) {
     if (!rawSid && !rawUid) return false;
 
@@ -77,81 +87,11 @@ class InstagramStoryBot {
     if (sid && uid) {
       this.sessionId = sid;
       this.userId = uid;
-      this.fullCookie = `sessionid=${this.sessionId}; ds_user_id=${this.userId}`;
       await this.fetchUsername();
       this.saveSession();
       return true;
     }
     return false;
-  }
-
-  async fetchUsername() {
-    try {
-      const res = await fetch(`https://i.instagram.com/api/v1/users/${this.userId}/info/`, {
-        headers: this.getHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user && data.user.username) {
-          this.username = data.user.username;
-        }
-      }
-    } catch (e) {}
-  }
-
-  async applySessionInput(input) {
-    if (!input) return false;
-    let sid = '';
-    let uid = '';
-    let csrf = '';
-
-    if (input.includes('sessionid=')) {
-      const matchSid = input.match(/sessionid=([^;]+)/);
-      if (matchSid) sid = matchSid[1];
-      const matchUid = input.match(/ds_user_id=([^;]+)/);
-      if (matchUid) uid = matchUid[1];
-      const matchCsrf = input.match(/csrftoken=([^;]+)/);
-      if (matchCsrf) csrf = matchCsrf[1];
-    } else {
-      sid = input.trim();
-    }
-
-    if (!uid && sid) {
-      const decoded = decodeURIComponent(sid);
-      const parts = decoded.split(':');
-      if (parts[0] && /^\d+$/.test(parts[0])) {
-        uid = parts[0];
-      }
-    }
-
-    if (sid && uid) {
-      this.sessionId = sid;
-      this.userId = uid;
-      if (csrf) this.csrfToken = csrf;
-      this.fullCookie = `sessionid=${this.sessionId}; ds_user_id=${this.userId}${this.csrfToken ? `; csrftoken=${this.csrfToken}` : ''}`;
-      await this.fetchUsername();
-      this.saveSession();
-      return true;
-    }
-    return false;
-  }
-
-  promptCredentials() {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    return new Promise((resolve) => {
-      rl.question('乂 - Username: ', (u) => {
-        rl.question('乂 - Password: ', (p) => {
-          rl.close();
-          resolve({
-            username: u.replace(/^@/, '').trim(),
-            password: p.trim(),
-          });
-        });
-      });
-    });
   }
 
   loadSession() {
@@ -167,8 +107,6 @@ class InstagramStoryBot {
           if (envData.username) this.username = envData.username;
           if (envData.userId) this.userId = String(envData.userId);
           this.sessionId = envData.sessionId;
-          this.csrfToken = envData.csrfToken || '';
-          this.fullCookie = envData.fullCookie || `sessionid=${this.sessionId}; ds_user_id=${this.userId}`;
           if (envData.deviceId) this.deviceId = envData.deviceId;
           if (envData.androidId) this.androidId = envData.androidId;
           return true;
@@ -201,8 +139,6 @@ class InstagramStoryBot {
         if (data.username) this.username = data.username;
         this.userId = String(data.userId);
         this.sessionId = data.sessionId;
-        this.csrfToken = data.csrfToken || '';
-        this.fullCookie = data.fullCookie || '';
         if (data.deviceId) this.deviceId = data.deviceId;
         if (data.androidId) this.androidId = data.androidId;
         return true;
@@ -221,8 +157,6 @@ class InstagramStoryBot {
         username: this.username,
         userId: this.userId,
         sessionId: this.sessionId,
-        csrfToken: this.csrfToken,
-        fullCookie: this.fullCookie,
         deviceId: this.deviceId,
         androidId: this.androidId,
         savedAt: new Date().toISOString(),
@@ -231,149 +165,6 @@ class InstagramStoryBot {
       const filename = `${this.username || this.userId || 'session'}.json`;
       fs.writeFileSync(path.join(this.sessionsDir, filename), jsonStr, 'utf8');
     } catch (e) {}
-  }
-
-  async login() {
-    try {
-      const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-      const initRes = await fetch('https://www.instagram.com/accounts/login/', {
-        headers: {
-          'User-Agent': ua,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-          'Sec-Ch-Ua-Mobile': '?0',
-          'Sec-Ch-Ua-Platform': '"Windows"',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Upgrade-Insecure-Requests': '1',
-        },
-      });
-
-      const html = await initRes.text();
-      const setCookies = initRes.headers.getSetCookie
-        ? initRes.headers.getSetCookie()
-        : initRes.headers.get('set-cookie')
-        ? [initRes.headers.get('set-cookie')]
-        : [];
-
-      let pageCsrf = '';
-      const initialCookies = [];
-      for (const c of setCookies) {
-        if (!c) continue;
-        initialCookies.push(c.split(';')[0]);
-        const mCsrf = c.match(/csrftoken=([^;]+)/);
-        if (mCsrf) pageCsrf = mCsrf[1];
-      }
-
-      const mHash = html.match(/"rollout_hash":"([^"]+)"/) || html.match(/"client_revision":(\d+)/);
-      const rolloutHash = mHash ? mHash[1] : '1053981060';
-
-      const encMatch = html.match(
-        /\["InstagramPasswordEncryption",\[\],\{"key_id":"(\d+)","public_key":"([a-f0-9]{64})","version":"(\d+)"\}/
-      );
-      if (!encMatch) {
-        console.log('— gagal mengambil enkripsi login');
-        return false;
-      }
-
-      const [, keyId, publicKey, version] = encMatch;
-      const encPass = await encryptPassword(this.password, version, keyId, publicKey);
-
-      const body = new URLSearchParams({
-        enc_password: encPass,
-        optIntoOneTap: 'false',
-        queryParams: '{}',
-        trustedDeviceRecords: '{}',
-        username: this.username,
-      });
-
-      const cookieHeader = initialCookies.join('; ');
-      const loginRes = await fetch('https://www.instagram.com/api/v1/web/accounts/login/ajax/', {
-        method: 'POST',
-        headers: {
-          'User-Agent': ua,
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'X-CSRFToken': pageCsrf,
-          'X-Requested-With': 'XMLHttpRequest',
-          'X-IG-App-ID': '936619743392459',
-          'X-ASBD-ID': '129477',
-          'X-Instagram-AJAX': rolloutHash,
-          'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-          'Sec-Ch-Ua-Mobile': '?0',
-          'Sec-Ch-Ua-Platform': '"Windows"',
-          'Sec-Fetch-Dest': 'empty',
-          'Sec-Fetch-Mode': 'cors',
-          'Sec-Fetch-Site': 'same-origin',
-          Referer: 'https://www.instagram.com/accounts/login/',
-          Origin: 'https://www.instagram.com',
-          Accept: '*/*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          Cookie: cookieHeader,
-        },
-        body: body.toString(),
-      });
-
-      const data = await loginRes.json();
-      const loginCookies = loginRes.headers.getSetCookie
-        ? loginRes.headers.getSetCookie()
-        : loginRes.headers.get('set-cookie')
-        ? [loginRes.headers.get('set-cookie')]
-        : [];
-
-      let newSessionId = '';
-      let newUserId = '';
-      let newCsrf = pageCsrf;
-      const cookieMap = new Map();
-
-      for (const c of [...setCookies, ...loginCookies]) {
-        if (!c) continue;
-        const main = c.split(';')[0];
-        const idx = main.indexOf('=');
-        if (idx !== -1) {
-          const k = main.substring(0, idx).trim();
-          const v = main.substring(idx + 1).trim();
-          cookieMap.set(k, v);
-          if (k === 'sessionid') newSessionId = v;
-          if (k === 'ds_user_id') newUserId = v;
-          if (k === 'csrftoken') newCsrf = v;
-        }
-      }
-
-      if (data.authenticated && newSessionId) {
-        this.sessionId = newSessionId;
-        this.userId = newUserId || String(data.userId);
-        this.csrfToken = newCsrf;
-        const fullCookieArr = [];
-        cookieMap.forEach((v, k) => fullCookieArr.push(`${k}=${v}`));
-        this.fullCookie = fullCookieArr.join('; ');
-
-        this.saveSession();
-        return true;
-      }
-
-      if (data.error_type === 'UserInvalidCredentials' || data.error_type === 'FakeIncorrectPassword') {
-        console.log('— password atau username salah');
-        return false;
-      }
-
-      if (data.message === 'checkpoint_required') {
-        this.lastCheckpointUrl = data.checkpoint_url ? `https://www.instagram.com${data.checkpoint_url}` : '';
-        console.log('— verifikasi checkpoint diperlukan');
-        if (this.lastCheckpointUrl) {
-          console.log(`— link verifikasi: ${this.lastCheckpointUrl}`);
-        }
-        return false;
-      }
-
-      console.log('— login gagal:', data.message || 'unknown error');
-    } catch (err) {
-      console.log(`— gagal login: ${err.message}`);
-    }
-
-    return false;
   }
 
   getHeaders() {
@@ -392,11 +183,10 @@ class InstagramStoryBot {
       'X-IG-Device-ID': this.deviceId,
       'X-IG-Android-ID': this.androidId,
       'X-IG-Capabilities': '3brTv10=',
-      'X-CSRFToken': this.csrfToken,
       'IG-INTENDED-USER-ID': this.userId,
       'IG-U-DS-USER-ID': this.userId,
       Authorization: `Bearer IGT:2:${authPayload}`,
-      Cookie: this.fullCookie,
+      Cookie: `sessionid=${this.sessionId}; ds_user_id=${this.userId}`,
     };
   }
 

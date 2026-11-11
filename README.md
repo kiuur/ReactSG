@@ -1,6 +1,6 @@
 # ReactSG
 
-A lightweight, automated Instagram bot to watch (view) and react (like) to stories of mutual friends. Supports both standalone continuous mode (Termux/VPS) and serverless deployment (Vercel + Cron).
+A lightweight, automated Instagram bot to watch (view) and react (like) to stories of mutual friends.
 
 ---
 
@@ -10,22 +10,21 @@ A lightweight, automated Instagram bot to watch (view) and react (like) to stori
 - **Auto Like / React Story**: Automatically likes new stories from mutual friends.
 - **Mutual Friends Only**: Strictly targets accounts that follow you back (mutual followers). Non-mutual accounts are completely ignored.
 - **Efficient Batch Requests**: Uses official batch reels media endpoints to avoid rate limits (no HTTP 429 errors).
-- **Dual Mode Support**:
-  - **Standalone Mode**: Runs continuously in terminal or background worker.
-  - **Serverless API Mode**: Runs on Vercel as an on-demand serverless function triggered by a cron job.
+- **Session-Based Authentication**: Uses direct Session ID input, completely bypassing login checkpoints, 2FA challenges, and anti-scripting blocks.
+- **Zero External Dependencies**: Built entirely using native Node.js standard libraries.
 - **Secure & Dynamic**: Device ID and Android ID are dynamically generated via Node.js native crypto module.
-- **Minimalist Output**: Clean console output in CLI and clean JSON responses in API mode.
+- **Minimalist Output**: Clean, unobtrusive console output (`— berhasil terhubung ke: @username`).
 
 ---
 
-## Option 1: Running on Termux / VPS (Standalone)
+## Prerequisites
 
-### Prerequisites
+- **Node.js** v18 or higher (Compatible with Termux on Android, Linux, macOS, and Windows).
+- Stable internet connection.
 
-- Node.js v18 or higher.
-- Internet connection.
+---
 
-### Steps
+## Installation & Usage
 
 1. **Clone the repository**:
    ```bash
@@ -33,62 +32,28 @@ A lightweight, automated Instagram bot to watch (view) and react (like) to stori
    cd ReactSG
    ```
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Run the bot**:
+2. **Run the bot**:
    ```bash
    node index.js
    ```
 
-4. **Login**:
-   - On first run, enter your Username and Password when prompted.
-   - The session will be saved in `sessions/<username>.json`.
-   - On subsequent runs, it connects automatically using the saved session.
-
----
-
-## Option 2: Deploying to Vercel (Serverless / 24 Hours)
-
-You can run this bot serverless on Vercel without keeping your device turned on.
-
-### 1. Deploy to Vercel
-
-Push the repository to GitHub and import it into Vercel, or deploy using the Vercel CLI:
-```bash
-vercel
-```
-
-### 2. Set Environment Variables in Vercel
-
-In your Vercel Project Dashboard (`Settings` -> `Environment Variables`), add:
-
-- `IG_SESSION`: Copy and paste the entire JSON content of your saved session file (`sessions/<username>.json`).
-- `CRON_SECRET` *(Optional but recommended)*: A private password/secret token to protect your endpoint (e.g. `mysecrettoken123`).
-
-### 3. Setup Automated Cron Trigger
-
-Because Vercel serverless functions execute on request, trigger your endpoint periodically using a free cron service (such as [cron-job.org](https://cron-job.org)):
-
-- **URL**: `https://your-vercel-domain.vercel.app/api?key=mysecrettoken123`
-- **Schedule**: Every 5 or 10 minutes.
-- **Method**: GET
-
-Each request will fetch mutual friends' stories, view and like any new stories, and return a summary in JSON.
+3. **Session Setup (First run only)**:
+   - When prompted, enter your **User ID** and **Session ID**:
+     ```text
+     乂 - User ID: 73356967687
+     乂 - Session ID: your_session_id_here
+     ```
+   - The bot will automatically verify the session, fetch your official username, and save it to `sessions/<username>.json`.
+   - On subsequent runs, the bot connects automatically without asking for credentials again.
 
 ---
 
 ## Directory Structure
 
 ```text
-├── api/
-│   └── index.js        # Vercel serverless function handler
-├── sessions/           # Local saved account sessions (*.json)
-├── index.js            # Bot core class & standalone runner
-├── vercel.json         # Vercel deployment configuration
-├── package.json        # Project dependencies
+├── sessions/           # Saved account sessions (*.json)
+├── index.js            # Main bot script
+├── package.json        # Project metadata
 ├── .gitignore          # Ignored files
 └── README.md           # Documentation
 ```
@@ -98,8 +63,7 @@ Each request will fetch mutual friends' stories, view and like any new stories, 
 ## Privacy & Security
 
 - **No Hardcoded Credentials**: No personal identifiers or account details are committed in the code.
-- **Git Ignored Sessions**: The `sessions/` directory is excluded from git.
-- **Private Endpoint**: When deploying to Vercel, use `CRON_SECRET` so only authorized requests can trigger the bot.
+- **Git Ignored Sessions**: The `sessions/` directory is excluded from git to prevent accidental commits of private session tokens.
 
 ---
 
